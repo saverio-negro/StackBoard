@@ -25,7 +25,9 @@ Though inspired by Apple’s system, this framework is not an attempt to replace
 
 SwiftUI’s opaque return types (`some View`) are powerful for abstraction, but they come at a cost: loss of concrete type identity. In other words, opaque return types are compiler-managed types, and Swift is purposefully abstracting them from us for type-safety reasons. 
 
-Now, in the context of `StackBoard`, this is a significant hindrance when detecting the role of a child view: I needed a mechanism to identify whether a view is a `StackBoardSection` and, if so, recursively extract and traverse its contents. That way, I was able to filter out any child view that's a `StackBoardSection` and be left with any other view. This resembles the native `Form` component's mechanism, which doesn't allow us to lay out contents in a `Section` view that's nested — however many levels deep (hence the need for recursing) — in a first-level `Section` (main section). In such a case, those child views nested within that deeper `Section` view are going to be recursively collected and displayed — in the order of their appearance (depth-first traversal) — into the main `Section` view.
+Now, in the context of `StackBoard`, this is a significant hindrance when detecting the role of a child view: I needed a mechanism to identify whether a view is a `StackBoardSection` and, if so, recursively extract and traverse its contents. That way, I was able to filter out any child view that's a `StackBoardSection` and be left with any other view. 
+
+The behavior I just described above resembles the native `Form` component's mechanism, which doesn't allow us to lay out contents in a `Section` view that's nested — however many levels deep (hence the need for recursing) — in a first-level `Section` (main section). In such a case, those child views nested within that deeper `Section` view are going to be recursively collected and displayed — in the order of their appearance (depth-first traversal) — into the main `Section` view.
 
 Now, if you were to rely solely on type casting, that wouldn't be a very flexible option, especially if the `StackBoardSection` struct is using generics:
 
@@ -33,7 +35,7 @@ Now, if you were to rely solely on type casting, that wouldn't be a very flexibl
 public struct StackBoardSection<Header: View, Footer: View>: View {
 ```
 
-For example, look at this code snippet:
+For example, look at the following code snippet, which is trying to use optional downcast — using the `as?` operator — with a concrete type `StackBoardSection<Text, EmptyView>`:
 
 ```swift
 if let section = view as? StackBoardSection<Text, EmptyView> {
@@ -41,15 +43,13 @@ if let section = view as? StackBoardSection<Text, EmptyView> {
 }
 ```
 
-This becomes problematic due to Swift's use of generics. `StackBoardSection` is a generic type parameterized over `Header` and `Footer`, so each instantiation—e.g., `StackBoardSection<Text, EmptyView>` vs. `StackBoardSection<Text, Text>`—is treated as a unique type by the compiler. As a result, runtime type checking or downcasting is brittle and unscalable:
+This becomes problematic due to Swift's use of generics. `StackBoardSection` is a generic type parameterized over `Header` and `Footer`, so each instantiation — e.g., `StackBoardSection<Text, EmptyView>` vs. `StackBoardSection<Text, Text>` — is treated as a unique type by the compiler. As a result, runtime type checking, or downcasting, is quite fragile, and while recursively traversing our tree of type-erased views (`AnyBlock`), we will likely miss some `StackBoardSection` view, in case we defined our `header` and `footer` properties differently upon instantiating the `StackBoardSection` struct.
 
+Therefore, that rigid behavior undermines our goal of supporting deeply nested sections with flexible headers and footers, and that's the reason why I came up with protocol-oriented programming, using a marker protocol.
 
+### Solution: Marker Protocol and Interface Abstraction
 
-This rigid behavior undermines our goal of supporting deeply nested sections with flexible headers and footers.
-
-### Solution: Marker Protocol + Interface Abstraction
-
-To overcome this, `StackBoard` introduces a **marker protocol**, `StackBoardSectionSource`, that all `StackBoardSection` types conform to, regardless of their generic parameters. Through this abstraction, the engine can:
+To overcome this, `StackBoard` introduces a **marker protocol**, `StackBoardSectionSource`, that all `StackBoardSection` types conform to, regardless of their generic parameters. Through this abstraction, the framework can:
 
 - Dynamically recognize whether a view acts as a section
 - Recursively extract the section’s children
