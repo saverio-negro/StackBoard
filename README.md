@@ -95,7 +95,7 @@ public struct AnyBlock: Identifiable, View {
 }
 ```
 
-This wrapper is critical for differentiating between leaf views and structural containers (i.e., sections), enabling runtime behavior branching.
+The `AnyBlock` wrapper is going to play a crucial role when we are recursively traversing the tree of type-erased views. It is key to differentiating between leaf views (view nodes with no children) and structural containers (i.e., sections), enabling runtime behavior branching.
 
 ---
 
