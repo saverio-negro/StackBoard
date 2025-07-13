@@ -6,40 +6,44 @@
 
 `StackBoard` is a SwiftUI layout system inspired by Apple’s native `Form` and `Section` components. It provides a similar declarative interface for grouping related UI elements in a structured, vertically stacked format. This makes it well-suited for settings screens, preference panels, or any UI where logical sectioning improves clarity.
 
-The goal of `StackBoard` is to mirror the design principles of `Form` while introducing additional architectural clarity. It preserves semantic roles at runtime, making it possible to inspect, traverse, and transform view hierarchies dynamically. While Apple’s native implementation abstracts away structural details for simplicity, `StackBoard` makes them accessible—carefully exposing just enough internals to support recursive layout logic, flattening, and compositional inspection.
+The goal of `StackBoard` is to mirror the design principles of `Form` while introducing additional architectural clarity. It preserves semantic roles at runtime, making it possible to inspect, traverse, and transform view hierarchies dynamically. While Apple’s native implementation abstracts away structural details for simplicity, `StackBoard` makes them accessible by exposing just enough internals to support recursive layout logic, flattening, and compositional inspection.
 
 Though inspired by Apple’s system, this framework is not an attempt to replace it. Rather, it serves as a learning exercise and an architectural foundation for building extensible layout primitives. `StackBoard` remains lightweight, idiomatic, and fully aligned with SwiftUI’s declarative approach—it simply adds tools to think more deeply about structure and composition.
 
-It provides a clean foundation for more advanced interface tools—still behaving like `Form`, but more flexible in its internals and extensible for larger design systems.
-
-It is intended as a foundational layout component in a broader UI toolkit, one that prioritizes scalability, semantic clarity, and compositional flexibility.
-
-Developers and technical reviewers alike should see this as a thoughtfully constructed UI layer that makes it easier to reason about view structure, reuse grouped content, and compose visual hierarchy in a predictable way—all with minimal ceremony and a declarative syntax that remains intuitive and expressive.
-
-`StackBoard` directly addresses these constraints by introducing a modular, introspectable, and highly composable architecture. It is not merely a replication of Apple's native layout components but rather a reimagining of how semantic structure, dynamic hierarchy, and runtime role detection can coexist with SwiftUI’s declarative ethos. `StackBoard` empowers developers to express layout semantics with clarity while maintaining full control over behavior and hierarchy at runtime.
-
 ## Core Design Features
 
-- **Semantic Role Recognition**: Differentiates between atomic views and structural containers using marker protocols.
-- **Recursive Layout Flattening**: Flattens nested section structures into unified visual outputs.
-- **Metadata-Preserving Type Erasure**: Leverages custom wrappers to retain behavioral metadata.
-- **Declarative Syntax via DSL**: Provides a fluent interface using `@resultBuilder` for seamless composition.
+- **Semantic Role Recognition**: Differentiates between atomic views (`StackBoardSection`'s nested views) and structural containers (`StackBoardSection` itself) using marker protocols (`StackBoardSectionSource`).
+- **Recursive Layout Flattening**: Flattens nested section structures into unified visual outputs using `filter(blocks:)`.
+- **Metadata-Preserving Type Erasure**: Leverages custom wrappers to retain behavioral metadata via `AnyBlock` type-erasure.
+- **Declarative Syntax via DSL**: Provides a fluent interface using `@resultBuilder` on `StackBoardBuilder` struct for seamless composition.
 
-`StackBoard` serves as a compositional foundation for architecting intelligent, declarative layout engines in SwiftUI.
+`StackBoard` serves as a compositional foundation for architecting type-responsive and declarative layout frameworks in SwiftUI.
 
 ---
 
-## Why Type Erasure Was Not Enough: The Generics Problem
+## The Limitation of Swift's Generic Inference for Type Recognition
 
-SwiftUI’s opaque return types (`some View`) are powerful for abstraction, but they come at a cost: loss of concrete type identity. In the context of `StackBoard`, this is a significant constraint. We needed a mechanism to identify whether a view is a `StackBoardSection` and—if so—recursively extract and traverse its contents.
+SwiftUI’s opaque return types (`some View`) are powerful for abstraction, but they come at a cost: loss of concrete type identity. In other words, opaque return types are compiler-managed types, and Swift is purposefully abstracting them from us for type-safety reasons. 
 
-This becomes problematic due to Swift's use of generics. `StackBoardSection` is a generic type parameterized over `Header` and `Footer`, so each instantiation—e.g., `StackBoardSection<Text, EmptyView>` vs. `StackBoardSection<Text, Text>`—is treated as a unique type by the compiler. As a result, runtime type checking or downcasting is brittle and unscalable:
+Now, in the context of `StackBoard`, this is a significant hindrance when detecting the role of a child view: I needed a mechanism to identify whether a view is a `StackBoardSection` and, if so, recursively extract and traverse its contents. That way, I was able to filter out any child view that's a `StackBoardSection` and be left with any other view. This resembles the native `Form` component's mechanism, which doesn't allow us to lay out contents in a `Section` view that's nested — however many levels deep (hence the need for recursing) — in a first-level `Section` (main section). In such a case, those child views nested within that deeper `Section` view are going to be recursively collected and displayed — in the order of their appearance (depth-first traversal) — into the main `Section` view.
+
+Now, if you were to rely solely on type casting, that wouldn't be a very flexible option, especially if the `StackBoardSection` struct is using generics:
+
+```swift
+public struct StackBoardSection<Header: View, Footer: View>: View {
+```
+
+For example, look at this code snippet:
 
 ```swift
 if let section = view as? StackBoardSection<Text, EmptyView> {
     // This will fail unless it's exactly that instantiation
 }
 ```
+
+This becomes problematic due to Swift's use of generics. `StackBoardSection` is a generic type parameterized over `Header` and `Footer`, so each instantiation—e.g., `StackBoardSection<Text, EmptyView>` vs. `StackBoardSection<Text, Text>`—is treated as a unique type by the compiler. As a result, runtime type checking or downcasting is brittle and unscalable:
+
+
 
 This rigid behavior undermines our goal of supporting deeply nested sections with flexible headers and footers.
 
