@@ -1,6 +1,5 @@
 //
 //  StackBoard.swift
-//  MyComponents
 //
 //  Created by Saverio Negro on 7/13/25.
 //
