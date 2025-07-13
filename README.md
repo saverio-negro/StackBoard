@@ -1,5 +1,7 @@
 # 04 – Hierarchical and Declarative Layout Architecture with `StackBoard`
 
+<img src="./Images/StackBoard.png" width="25%" />
+
 ## Introduction
 
 `StackBoard` is a SwiftUI layout system inspired by Apple’s native `Form` and `Section` components. It provides a similar declarative interface for grouping related UI elements in a structured, vertically stacked format. This makes it well-suited for settings screens, preference panels, or any UI where logical sectioning improves clarity.
@@ -232,20 +234,35 @@ public struct StackBoard: View {
 
 ```swift
 StackBoard {
+            
+    // Section behavior parsed
     StackBoardSection("Account") {
         Text("Name")
         Text("Email")
     }
-
+    
+    // Section behavior parsed
     StackBoardSection("Preferences") {
-        StackBoardSection("Notifications") {
+        
+        // Section behavior ignored
+        StackBoardSection("Notifications (Ignored)") {
             Text("Push")
             Text("Email")
+            
+            // Section behavior ignored
+            StackBoardSection("Modes (Ignored)") {
+                Text("Save Power")
+                Text("Sleep Mode")
+            }
         }
+        
         Text("Dark Mode")
     }
-
-    Text("Footer Info")
+    
+    // Section behavior parsed
+    StackBoardSection("Footer") {
+        Text("Footer Info")
+    }
 }
 ```
 
