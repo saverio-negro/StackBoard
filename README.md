@@ -49,11 +49,11 @@ Therefore, that rigid behavior undermines our goal of supporting deeply nested s
 
 ### Solution: Marker Protocol and Interface Abstraction
 
-To overcome this, `StackBoard` introduces a **marker protocol**, `StackBoardSectionSource`, that all `StackBoardSection` types conform to, regardless of their generic parameters. Through this abstraction, the framework can:
+To overcome this, I introduced a **marker protocol**, `StackBoardSectionSource`, that all `StackBoardSection` types conform to, _regardless_ of their generic parameters. Through this abstraction, the framework can:
 
-- Dynamically recognize whether a view acts as a section
-- Recursively extract the section’s children
-- Preserve runtime behavior without depending on exact generic instantiations
+- Dynamically recognize whether a view acts as a section.
+- Recursively extract the section’s children.
+- Preserve runtime behavior without depending on exact generic instantiations.
 
 ```swift
 protocol StackBoardSectionSource: View {
@@ -61,13 +61,13 @@ protocol StackBoardSectionSource: View {
 }
 ```
 
-This design reflects Swift’s protocol-oriented programming philosophy. Rather than relying on fragile downcasting or generic specialization, we decouple behavior from type identity and reintroduce flexible, runtime-safe introspection.
+This design reflects Swift’s protocol-oriented programming philosophy. Rather than relying on fragile downcasting, we introduce flexible, runtime-safe introspection using protocol conformance.
 
 > **Summary:** This design unlocks recursive traversal, compositional transparency, and semantic expressiveness in a type-safe and extensible manner.
 
 ---
 
-## AnyBlock: Wrapping Views with Semantics
+## AnyBlock: Wrapping Views While Preserving Semantic Metadata
 
 To further facilitate this flexibility, we introduce `AnyBlock`: a type-erased wrapper around any `View`. Unlike `AnyView`, which erases type without context, `AnyBlock` preserves semantic metadata:
 
@@ -117,13 +117,17 @@ public struct StackBoardBuilder {
 }
 ```
 
-This guarantees compatibility with heterogeneous views while maintaining structural semantics.
+The `AnyBlock` wrapper takes on an essential role in embedding all views under a _unified_ type (`AnyBlock`) by type-erasing them — that's what our `buildExpression` function is doing. At compile time, Swift runs `buildExpression` for each `View` object within the body of the function being wrapped with `@resultBuilder`. That makes it possible for `buildBlock` to manage a list of homogenous, type-erased views (`AnyBlock`) and avoid conflicting types, had we accepted mixed `View` objects via a generic type parameter `T: View` and let the Swift compiler infer the type according to the first element in the variadic list, whose type may not to match the type of the remaining views within the `components` variadic parameter.
+
+However, despite `AnyBlock` being a type-eraser, it differs from `AnyView`. That is, before wrapping our concrete type within `AnyView`, it preserves important metadata — stored in `isSection` and `source` — as a means to perform section role recognition. 
+
+> **Summary**: Using type-erased views guarantees compatibility with heterogeneous views while maintaining structural semantics.
 
 ---
 
 ## StackBoardSection: Compositional Grouping
 
-`StackBoardSection` acts as a logical grouping mechanism with optional headers and footers. It conforms to `StackBoardSectionSource` and exposes its children through `extractBlocks()`:
+`StackBoardSection` acts as a logical grouping mechanism with optional headers and footers. It conforms to `StackBoardSectionSource` and exposes/extracts its child views through `extractBlocks()`:
 
 ```swift
 extension StackBoardSection: StackBoardSectionSource {
@@ -173,11 +177,12 @@ public struct StackBoardSection<Header: View, Footer: View>: View {
 
 ## Recursive Tree Traversal
 
-To support arbitrarily nested sections, `StackBoardSectionContent` recursively flattens its input. The engine performs a depth-first traversal of `AnyBlock` wrappers:
+To support arbitrarily nested sections, `StackBoardSectionContent` recursively "flattens" its input. In other words, it extracts all child views in any `Section` view that is any level deeper than the main one — `StackBoard` local scope. It achieves it by performing a depth-first traversal of `AnyBlock` wrappers using the `filter(blocks:)` recursive function.
 
 ```swift
 private func filter(blocks: [AnyBlock]) -> [AnyBlock] {
     var flat = [AnyBlock]()
+
     for block in blocks {
         if let nested = block.source?.extractBlocks() {
             flat.append(contentsOf: filter(blocks: nested))
@@ -185,17 +190,18 @@ private func filter(blocks: [AnyBlock]) -> [AnyBlock] {
             flat.append(block)
         }
     }
+
     return flat
 }
 ```
 
-This flattening ensures visual consistency and avoids unintended nesting artifacts.
+This "flattening" ensures visual consistency and avoids the rendering of `Section` views — sections are rendered differently than any other views — within other `Section` views, limiting the rendering of `Section` to the first layer — in `StackBoard`.
 
 ---
 
 ## StackBoard: Rendering Logic
 
-The main layout engine uses metadata in `AnyBlock` to decide rendering strategy at runtime:
+The `StackBoard` view uses metadata in `AnyBlock` to decide rendering strategy at runtime:
 
 ```swift
 public struct StackBoard: View {
@@ -209,6 +215,7 @@ public struct StackBoard: View {
         VStack {
             VStack(spacing: 1) {
                 ForEach(blocks) { block in
+                    // Based on preserved metadata, before type-erasure, it either renders the view as a section or as any other view.
                     if block.isSection {
                         block
                     } else {
@@ -234,7 +241,7 @@ public struct StackBoard: View {
 }
 ```
 
-### Example
+### Example: `StackBoard` API Usage
 
 ```swift
 StackBoard {
@@ -274,12 +281,11 @@ This produces a flat, semantically structured layout regardless of nested depth.
 
 ---
 
-## Summary: Principles and Takeaways
+## Wrap-up: Main Features of `StackBoard`
 
-- **Reflective Composition**: Enables runtime hierarchy evaluation
-- **Protocol-Driven Design**: Avoids fragile generic specializations
-- **Structural Flattening**: Supports deeply nested yet visually linear layouts
-- **Declarative Ergonomics**: Maintains intuitive authoring syntax
+- **Reflective Composition**: Enables runtime hierarchy evaluation.
+- **Protocol-Driven Design**: Avoids fragile generic specializations via protocol conformance.
+- **Structural Flattening**: Supports deeply nested yet visually linear layouts via recursive extraction of atomic views.
 
 ---
 
