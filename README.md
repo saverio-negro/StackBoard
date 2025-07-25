@@ -119,7 +119,7 @@ public struct StackBoardBuilder {
 
 The `AnyBlock` wrapper takes on an essential role in embedding all views under a _unified_ type (`AnyBlock`) by type-erasing them — that's what our `buildExpression` function is doing. At compile time, Swift runs `buildExpression` for each `View` object within the body of the function being wrapped with `@resultBuilder`. That makes it possible for `buildBlock` to manage a list of homogenous, type-erased views (`AnyBlock`) and avoid conflicting types, had we accepted mixed `View` objects via a generic type parameter `T: View` and let the Swift compiler infer the type according to the first element in the variadic list, whose type may not to match the type of the remaining views within the `components` variadic parameter.
 
-However, despite `AnyBlock` being a type-eraser, it differs from `AnyView`. That is, before wrapping our concrete type within `AnyView`, it preserves important metadata — stored in `isSection` and `source` — as a means to perform section role recognition. 
+However, despite `AnyBlock` being a type-eraser, it differs from `AnyView`. That is, before wrapping our concrete type within `AnyBlock`, it preserves important metadata — stored in `isSection` and `source` — as a means to perform section role recognition. 
 
 > **Summary**: Using type-erased views guarantees compatibility with heterogeneous views while maintaining structural semantics.
 
